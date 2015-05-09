@@ -1,0 +1,5 @@
+describe('Unextended Logging Test With Unextended Test Runner', function () {
+	it("should be able to log stuff given logger instantiated and imported by the unextended test runner", function() {
+    log.info("Successfully logged something. No error from logging = test passed.");
+  });
+});
