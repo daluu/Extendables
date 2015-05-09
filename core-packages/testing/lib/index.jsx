@@ -1,42 +1,59 @@
-﻿#include ../../../dependencies/jasmine.js
+﻿#include "../../../dependencies/jasmine.js";
 
-exports.jasmine = jasmine;
-exports.spyOn = spyOn;
-exports.it = it;
-exports.xit = xit;
-exports.expect = expect;
-exports.runs = runs;
-exports.waits = waits;
-exports.waitsFor = waitsFor;
-exports.beforeEach = beforeEach;
-exports.afterEach = afterEach;
-exports.describe = describe;
-exports.xdescribe = xdescribe;
+if(typeof exports != 'undefined'){
+	exports.jasmine = jasmine;
+	exports.spyOn = spyOn;
+	exports.it = it;
+	exports.xit = xit;
+	exports.expect = expect;
+	exports.runs = runs;
+	exports.waits = waits;
+	exports.waitsFor = waitsFor;
+	exports.beforeEach = beforeEach;
+	exports.afterEach = afterEach;
+	exports.describe = describe;
+	exports.xdescribe = xdescribe;
+}
 
-var Template = require("templating").Template;
+if(typeof require != 'undefined')
+	var Template = require("templating").Template;
+
+function sumResults(results,type){
+	var sum = 0;
+	for(var i = 0; i < results.length; i++){
+		var result = results[i];
+		sum += result[type];
+	}
+	return sum;
+}
 
 var TestRunner = function () {
 	this._clean_results = function (suites, results) {
-		var cleaned_results = suites.map(function(suite) {
+		var cleaned_results = [];
+		var len = suites.length;
+	    for (var i = 0; i < len; i++){
+	    	var suite = suites[i];
 			var total = suite.children.length;
-			var passed = suite.children.filter(function(spec) { 
-				return (results[spec.id].result == "passed");
-			}).length;
-			var specs = suite.children.map(function (spec) {
-				return {'name': spec.name, 
+			var passed = 0;
+			var specs = [];
+			for(var j = 0; j < total; j++){
+				var spec = suite.children[j];
+				specs.push({
+					'name': spec.name, 
 					'result': results[spec.id].result, 
 					'messages': results[spec.id].messages
-					}
-			});
-
-			return {
+					});
+				if(results[spec.id].result == "passed") passed++;
+			}
+			
+			cleaned_results.push({
 				'name': suite.name,
 				'passed': passed,
 				'failed': new Number(total - passed),
 				'total': total,
 				'specs': specs
-				};
-		});
+				});
+		}
 		return cleaned_results;
 	}
 
@@ -57,9 +74,12 @@ var TestRunner = function () {
 			'app': app.name,
 			'app version': app.version
 		}
-		return env.keys().map(function (key) {
-			return {'key': key, 'value': env[key]};
-		});
+		var keyMap = [];
+		for(var key in env){
+			if(env.hasOwnProperty(key))
+				keyMap.push({'key': key, 'value': env[key]});
+		}
+		return keyMap;
 	}
 
 	// we'll add this into the html representation, 
@@ -70,13 +90,14 @@ var TestRunner = function () {
 
 	this.to_console = function () {
 		var results = this.run();
-		
-		results.forEach(function(suite) {
-			$.writeln("\nSuite: {} \tran {} tests, {} failure(s)".format(suite.name, suite.total, suite.failed));
-			suite.specs.forEach(function(spec) {
-				$.writeln("\t" + spec.result.toUpperCase() + "\t" + spec.name);
-			});
-		});
+
+		for(var i = 0; i < results.length; i++){
+			var suite = results[i];
+			$.writeln("\nSuite: " + suite.name + " \tran " + suite.total + " tests, " + suite.failed + " failure(s)");
+			for(var j = 0; j < suite.specs.length; j++){
+				$.writeln("\t" + suite.specs[j].result.toUpperCase() + "\t" + suite.specs[j].name);
+			}
+		}		
 	}
 
 	this.to_log = function () {
@@ -87,37 +108,46 @@ var TestRunner = function () {
 		// some background info
 		var datetime = new Date();
 		var date = datetime.toDateString();
-		var time = "{}:{}".format(datetime.getHours(), datetime.getMinutes());
+		var time = datetime.getHours() + ":" + datetime.getMinutes();
 		var environment = this.get_environment();	
 
 		// run tests
 		var results = this.run();
 		
 		// tidy up results
-		results.forEach(function(suite) {
-			suite.specs.forEach(function(spec) {
-				if (spec.result == 'failed') {
-					var messages = spec.messages.reject(function (message) {
-						return message == 'Passed.';
-					});
-					spec.problem = '<p class="problem">{}</p>'.format(messages.join("<br />"));
+		for(var i = 0; i < results.length; i++){
+			var suite = results[i];
+			for(var j = 0; j < suite.specs.length; j++){
+				if (suite.specs[j].result == 'failed') {
+					var messages = [];
+					for(var k = 0; k < suite.specs[j].messages.length; k++){
+						if(suite.specs[j].messages[k] != 'Passed.')
+							messages.push(suite.specs[j].messages[k]);
+					}
+					suite.specs[j].problem = '<p class="problem">' + messages.join("<br />") + '</p>';
 				} else {
-					spec.problem = '';
+					suite.specs[j].problem = '';
 				}
-			});
-		});
-		
+			}
+		}
+
 		var duration = ((new Date().getTime() - datetime.getTime())/1000).toFixed(2);
 
-        var template = new Template("report.html", module);
+		if(typeof module != 'undefined')
+        	var template = new Template("report.html", module);
+        else{
+        	var path = new File($.fileName).fullName;
+        	var module = {id: "index", uri: path};
+        	var template = new Template("report.html", module);
+        }
 		template.render({
 		  'date': date, 
 		  'time': time, 
 		  'duration': duration, 
 		  'suites': results, 
-		  'total': results.sum('total'),
-		  'fails': results.sum('failed'),
-		  'passes': results.sum('passed'),
+		  'total': sumResults(results,'total'),
+		  'fails': sumResults(results,'failed'),
+		  'passes': sumResults(results,'passed'),
 		  'environment': environment
 		});
 		template.write_to(filename);
@@ -130,4 +160,5 @@ var TestRunner = function () {
 	}
 }
 
-exports.tests = new TestRunner();
+if(typeof exports != 'undefined')
+	exports.tests = new TestRunner();

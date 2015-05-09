@@ -22,13 +22,17 @@
  *     "Hello there, mister, I've heard your name is John Smith"
  */
 
-exports.format = function() {
-	var replacements = arguments.to('array');
+exports.format = function() {	
+	var replacements = Array.prototype.slice.call(arguments);
 	var str = replacements.shift();
 	var named = replacements.length == 1 && replacements[0].reflect.name == 'Object';
 	
 	if (named) {
 		var dict = replacements[0];
+		var keys = [];
+		for (var key in dict) {
+	        if (dict.hasOwnProperty(key) && !(dict[key] instanceof Function)) keys.push(key);
+	    }	
         dict.keys().forEach(function (key) {
 			// replace globally (flagged g)
 			str = str.replace("{" + key + "}", dict[key], "g");

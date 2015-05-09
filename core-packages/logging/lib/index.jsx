@@ -10,8 +10,8 @@ var LogMessage = function (severity, message) {
     this.severity = severity;
     this.message = message;
     
-    this.toString = function () {
-        return "{} :: {}\t{}".format(this.date, SEVERITY[this.severity], this.message);
+    this.toString = function () {        
+        return this.date + " :: " + SEVERITY[this.severity] + "\t" + this.message;
     }
 }
 
@@ -39,8 +39,11 @@ var Log = function (name, log_level) {
 	var self = this;
 	this.name = name;
 	// log level can be specified both by name or directly as a level.
-	if (log_level && log_level.is(String)) log_level = SEVERITY.indexOf(log_level);
-	this.log_level = log_level || settings.LOGGING_LOG_LEVEL || 4;
+	if (log_level && log_level instanceof String) log_level = SEVERITY.indexOf(log_level);
+	if((typeof settings != 'undefined') && (typeof settings.LOGGING_LOG_LEVEL != 'undefined'))
+		this.log_level = log_level || settings.LOGGING_LOG_LEVEL || 4;
+	else
+		this.log_level = log_level || 4;	
 	
 	this.truncate = function (forced) {
 		// truncate the logfile if it gets bigger than half a megabyte
@@ -62,10 +65,11 @@ var Log = function (name, log_level) {
 
 	// basic logger
 	this.log = function () {
-		var arguments = arguments.to('array');
+		var arguments = Array.prototype.slice.call(arguments);
 		var severity  = arguments.shift();
-		var template = arguments.shift();
-		var message = template.format.apply(template, arguments);
+		//var template = arguments.shift();
+		//var message = template.format.apply(template, arguments);
+		var message = arguments;
 		// only log what's equal to or below the configured logging treshold
 		if (severity <= self.log_level) {
 			self.writeln(severity, message);
@@ -78,7 +82,7 @@ var Log = function (name, log_level) {
 	 * @param {String|Object} [replacements] Can take any number of replacements, to be passed along to str.format()
 	 */
 	this.debug = function () {
-		arguments = [5].concat(arguments.to('array'));
+		arguments = [5].concat(Array.prototype.slice.call(arguments));
 		self.log.apply(null, arguments);
 	}
 	/**
@@ -87,7 +91,7 @@ var Log = function (name, log_level) {
 	 * @param {String|Object} [replacements] Can take any number of replacements, to be passed along to str.format()
 	 */
 	this.info = function () {
-		arguments = [4].concat(arguments.to('array'));
+		arguments = [4].concat(Array.prototype.slice.call(arguments));
 		self.log.apply(null, arguments);		
 	}
 	/**
@@ -96,7 +100,7 @@ var Log = function (name, log_level) {
 	 * @param {String|Object} [replacements] Can take any number of replacements, to be passed along to str.format()
 	 */
 	this.warning = function () {		
-		arguments = [3].concat(arguments.to('array'));
+		arguments = [3].concat(Array.prototype.slice.call(arguments));
 		self.log.apply(null, arguments);		
 	}
 	/**
@@ -105,7 +109,7 @@ var Log = function (name, log_level) {
 	 * @param {String|Object} [replacements] Can take any number of replacements, to be passed along to str.format()
 	 */
 	this.error = function () {		
-		arguments = [2].concat(arguments.to('array'));
+		arguments = [2].concat(Array.prototype.slice.call(arguments));
 		self.log.apply(null, arguments);		
 	}
 	/**
@@ -114,14 +118,19 @@ var Log = function (name, log_level) {
 	 * @param {String|Object} [replacements] Can take any number of replacements, to be passed along to str.format()
 	 */
 	this.critical = function () {			
-		arguments = [1].concat(arguments.to('array'));
+		arguments = [1].concat(Array.prototype.slice.call(arguments));
 		self.log.apply(null, arguments);	
 	}
 
 	// init
-	var logfolder = settings.LOGGING_FOLDER || new Folder("log").at(Folder.extendables);
-	this.file = new File(this.name).at(logfolder);
+	var logfolder = null;
+	if((typeof settings != 'undefined') && (typeof settings.LOGGING_FOLDER != 'undefined'))
+		logfolder = settings.LOGGING_FOLDER || new Folder(new File($.fileName).parent.parent.parent.path + "/log"); //new Folder("log").at(Folder.extendables);
+	else
+		logfolder = new Folder(new File($.fileName).parent.parent.parent.path + "/log");
+	this.file = new File(logfolder.fullName + "/" + this.name); //new File(this.name).at(logfolder);
 	this.truncate();
 }
 
-exports.Log = Log;
+if(typeof exports != 'undefined')
+	exports.Log = Log;
