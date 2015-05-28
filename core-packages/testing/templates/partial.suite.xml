@@ -1,0 +1,6 @@
+<testsuite>
+    <name>{name}</name>
+    <totaltests>{total}</totaltests>
+    <failedtests>{failed}</failedtests>
+    {specs => partial.test.xml}
+</testsuite>

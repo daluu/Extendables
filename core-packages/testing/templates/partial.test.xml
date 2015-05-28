@@ -1,0 +1,5 @@
+    <testresult>
+    	<name>{name}</name>
+	    <result>{result}</result>
+        <problem>{problem}</problem> <!-- empty if none -->
+    </testresult>

@@ -32,3 +32,5 @@ for(var j = 0; j < specs.length; j++){
 }
 
 tests.to_html("WhateverYouNameThisTestSuiteResults " + timestamp + ".html");
+//tests.to_xml("WhateverYouNameThisTestSuiteResults " + timestamp + ".xml");
+//log.info(tests.as_json().toSource());

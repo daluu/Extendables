@@ -28,6 +28,15 @@ function sumResults(results,type){
 }
 
 var TestRunner = function () {
+	this.results = null;
+	this.runInfo = {
+		duration: 0,
+		date: null,
+		time: null,
+		environment: null,
+		testRan: false
+	}
+
 	this._clean_results = function (suites, results) {
 		var cleaned_results = [];
 		var len = suites.length;
@@ -64,6 +73,17 @@ var TestRunner = function () {
 		return this._clean_results(reporter.suites_, reporter.results());
 	}
 
+	this.parseResults = function(){
+		// some background info
+		var datetime = new Date();
+		this.runInfo.date = datetime.toDateString();
+		this.runInfo.time = datetime.getHours() + ":" + datetime.getMinutes();
+		this.runInfo.environment = this.get_environment();
+		this.results = this.run(); // run tests
+		this.runInfo.duration = ((new Date().getTime() - datetime.getTime())/1000).toFixed(2);
+		this.testRan = true;
+	}
+
 	this.get_environment = function () {
 		var env = {
 			'OS': $.os,
@@ -85,14 +105,53 @@ var TestRunner = function () {
 	// we'll add this into the html representation, 
 	// so people can upload structured test reports to our central server.
 	this.as_json = function () {
+
+		if(!this.runInfo.testRan) this.parseResults();
 		
+		// tidy up results
+		for(var i = 0; i < this.results.length; i++){
+			var suite = this.results[i];
+			for(var j = 0; j < suite.specs.length; j++){
+				if (suite.specs[j].result == 'failed') {
+					var messages = [];
+					for(var k = 0; k < suite.specs[j].messages.length; k++){
+						if(suite.specs[j].messages[k] != 'Passed.')
+							messages.push(suite.specs[j].messages[k]);
+					}
+					suite.specs[j].problem = messages.join("\n");
+				} else {
+					suite.specs[j].problem = '';
+				}
+			}
+		}
+
+		var jsonResult = {};
+		var testSuiteLinks = {};
+		var resultsOverview = {};
+		jsonResult.title = "Extendables test report";
+		testSuiteLinks['patch tests'] = "tests.patches.html";
+		testSuiteLinks['framework tests'] = "tests.framework.html";
+		testSuiteLinks['package tests'] = "tests.packages.html";
+		jsonResult['test suites'] = testSuiteLinks;
+		jsonResult['date'] = this.runInfo.date;
+		jsonResult['time'] = this.runInfo.time;
+		resultsOverview['total tests'] = sumResults(this.results,'total');
+		resultsOverview['passed tests'] = sumResults(this.results,'passed');
+		resultsOverview['failed tests'] = sumResults(this.results,'failed');
+		resultsOverview['test duration'] = this.runInfo.duration;
+		jsonResult.overview = resultsOverview;
+		jsonResult.suites = this.results;
+		jsonResult.environment = this.runInfo.environment;
+
+		return jsonResult;
 	}
 
 	this.to_console = function () {
-		var results = this.run();
 
-		for(var i = 0; i < results.length; i++){
-			var suite = results[i];
+		if(!this.runInfo.testRan) this.parseResults();
+
+		for(var i = 0; i < this.results.length; i++){
+			var suite = this.results[i];
 			$.writeln("\nSuite: " + suite.name + " \tran " + suite.total + " tests, " + suite.failed + " failure(s)");
 			for(var j = 0; j < suite.specs.length; j++){
 				$.writeln("\t" + suite.specs[j].result.toUpperCase() + "\t" + suite.specs[j].name);
@@ -105,18 +164,12 @@ var TestRunner = function () {
 	}
 
 	this.to_html = function (filename) {
-		// some background info
-		var datetime = new Date();
-		var date = datetime.toDateString();
-		var time = datetime.getHours() + ":" + datetime.getMinutes();
-		var environment = this.get_environment();	
 
-		// run tests
-		var results = this.run();
+		if(!this.runInfo.testRan) this.parseResults();
 		
 		// tidy up results
-		for(var i = 0; i < results.length; i++){
-			var suite = results[i];
+		for(var i = 0; i < this.results.length; i++){
+			var suite = this.results[i];
 			for(var j = 0; j < suite.specs.length; j++){
 				if (suite.specs[j].result == 'failed') {
 					var messages = [];
@@ -131,8 +184,6 @@ var TestRunner = function () {
 			}
 		}
 
-		var duration = ((new Date().getTime() - datetime.getTime())/1000).toFixed(2);
-
 		if(typeof module != 'undefined')
         	var template = new Template("report.html", module);
         else{
@@ -141,14 +192,55 @@ var TestRunner = function () {
         	var template = new Template("report.html", module);
         }
 		template.render({
-		  'date': date, 
-		  'time': time, 
-		  'duration': duration, 
-		  'suites': results, 
-		  'total': sumResults(results,'total'),
-		  'fails': sumResults(results,'failed'),
-		  'passes': sumResults(results,'passed'),
-		  'environment': environment
+		  'date': this.runInfo.date, 
+		  'time': this.runInfo.time, 
+		  'duration': this.runInfo.duration, 
+		  'suites': this.results, 
+		  'total': sumResults(this.results,'total'),
+		  'fails': sumResults(this.results,'failed'),
+		  'passes': sumResults(this.results,'passed'),
+		  'environment': this.runInfo.environment
+		});
+		template.write_to(filename);
+	}
+
+	this.to_xml = function (filename) {
+
+		if(!this.runInfo.testRan) this.parseResults();
+		
+		// tidy up results
+		for(var i = 0; i < this.results.length; i++){
+			var suite = this.results[i];
+			for(var j = 0; j < suite.specs.length; j++){
+				if (suite.specs[j].result == 'failed') {
+					var messages = [];
+					for(var k = 0; k < suite.specs[j].messages.length; k++){
+						if(suite.specs[j].messages[k] != 'Passed.')
+							messages.push(suite.specs[j].messages[k]);
+					}
+					suite.specs[j].problem = messages.join("\n");
+				} else {
+					suite.specs[j].problem = '';
+				}
+			}
+		}
+
+		if(typeof module != 'undefined')
+        	var template = new Template("report.xml", module);
+        else{
+        	var path = new File($.fileName).fullName;
+        	var module = {id: "index", uri: path};
+        	var template = new Template("report.xml", module);
+        }
+		template.render({
+		  'date': this.runInfo.date, 
+		  'time': this.runInfo.time, 
+		  'duration': this.runInfo.duration, 
+		  'suites': this.results, 
+		  'total': sumResults(this.results,'total'),
+		  'fails': sumResults(this.results,'failed'),
+		  'passes': sumResults(this.results,'passed'),
+		  'environment': this.runInfo.environment
 		});
 		template.write_to(filename);
 	}
