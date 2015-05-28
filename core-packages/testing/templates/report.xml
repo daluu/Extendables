@@ -2,9 +2,9 @@
 <report>
     <title>Extendables test report</title>
     <testsuites>
-        <testsuite file="tests.patches.html">patch tests</testsuite>
-        <testsuite file="tests.framework.html">framework tests</testsuite>
-        <testsuite file="tests.packages.html">package tests</testsuites>
+        <testsuite file="tests.patches.xml">patch tests</testsuite>
+        <testsuite file="tests.framework.xml">framework tests</testsuite>
+        <testsuite file="tests.packages.xml">package tests</testsuites>
     </testsuites>
 	<date>{date}</date>
     <time>{time}</time>
