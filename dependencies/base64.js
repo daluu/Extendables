@@ -1,7 +1,9 @@
-﻿exports.encode64 = encoder('+/');
-exports.decode64 = decoder('+/');
-exports.urlsafeEncode64 = encoder('-_');
-exports.urlsafeDecode64 = decoder('-_');
+﻿if(typeof exports != 'undefined'){
+  exports.encode64 = encoder('+/');
+  exports.decode64 = decoder('+/');
+  exports.urlsafeEncode64 = encoder('-_');
+  exports.urlsafeDecode64 = decoder('-_');
+}
 
 // base64.js - Base64 encoding and decoding functions
 //
@@ -11,6 +13,11 @@ exports.urlsafeDecode64 = decoder('-_');
 // Modified by TJ Holowaychuk for CommonJS module support.
 // Modified by Ben Weaver to use any alphabet.
 // Modified by Stijn Debrouwere for ExtendScript support.
+// Modified by David Luu for use w/ or w/o exports capability in ExtendScript
+
+//to use encoder()
+//var encode64 = encoder('+/'); //as per exports above whether you want regular or url safe encoding
+//encode64(data);
 
 function encoder(extra) {
   var chars = alphabet(extra);
@@ -36,6 +43,10 @@ function encoder(extra) {
     return encoded.join('');
   };
 }
+
+//to use decoder()
+//var decode64 = decoder('+/'); //as per exports above whether you want regular or url safe decoding
+//decode64(data);
 
 function decoder(extra) {
   var chars = alphabet(extra),
