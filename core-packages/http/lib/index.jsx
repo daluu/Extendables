@@ -1,22 +1,40 @@
 ﻿// convenience shortcuts
 // basic_auth (opt): any object that satisfies {'username': x, 'password': y}
 
-// exports
-exports.get = get;
-exports.head = head;
-exports.post = post;
-exports.put = put;
-exports.del = del;
-exports.has_internet_access = has_internet_access;
-exports.HTTPError = HTTPError;
-exports.HTTPRequest = HTTPRequest;
+if(typeof base64 == undefined){
+	#include "../../../dependencies/base64.js";
+	var encode64 = encoder('+/');
+}
 
+// exports
+if(typeof exports != 'undefined'){
+	exports.get = get;
+	exports.head = head;
+	exports.post = post;
+	exports.put = put;
+	exports.del = del;
+	exports.has_internet_access = has_internet_access;
+	exports.HTTPError = HTTPError;
+	exports.HTTPRequest = HTTPRequest;
+}
 // imports
-var url = exports.url = require("http/url");
-var ByteString = require("io/octals").ByteString;
+var url = "";
+if(typeof exports != 'undefined' && typeof require != 'undefined')
+	url = exports.url = require("http/url");
+
+if(typeof require != 'undefined')
+	var ByteString = require("io/octals").ByteString;
+else{
+	#include "../../io/lib/octals.jsx";
+	var ByteString = ByteString;
+}
 
 // definitions
-var HTTPError = Error.factory("HTTPError");
+var HTTPError;
+if(typeof Error.factory != 'undefined')
+	HTTPError = Error.factory("HTTPError");
+else
+	HTTPError = Error;
 
 // basic_auth: authentication with an intranet is a common use-case
 // timeout: we want to make it easy to do long polling
@@ -209,15 +227,23 @@ function HTTPRequest (method, url, timeout) {
 	/** @desc The resource to request */
 	this.url = function (url) {
 		if (url) {
-			this._url = require("http/url").parse(url);
-			this.header("Host", this._url.host);
+			try{
+				this._url = require("http/url").parse(url);
+				this.header("Host", this._url.host);
+			}catch(e){
+				this._url = url;
+			}
 		} else {
 			return this._url;
 		}
 	}
 	this.url(url);
 
-	this._port = this.url().port || 80;
+	try{
+		this._port = this.url().port || 80;
+	}catch(e){
+		this._port = 80;
+	}
 	/** @desc The server port the request should be directed to. */
 	this.port = function (number) {
 		if (number) {
@@ -241,7 +267,12 @@ function HTTPRequest (method, url, timeout) {
 	/** @desc How long before the http client should give up the request. 5 seconds by default. */
 	this.timeout = function (duration) {
 		if (duration) {
-			if (!duration.is(Number)) throw new TypeError("Timeout should be a number of seconds.");
+			if (!duration.is(Number)){
+				if(typeof TypeError != undefined)
+					throw new TypeError("Timeout should be a number of seconds.");
+				else
+					throw new Error("Timeout should be a number of seconds.");	
+			} 
 			this._timeout = duration;
 		} else {
 			return this._timeout;
@@ -297,7 +328,7 @@ function HTTPRequest (method, url, timeout) {
 			// we could easily change this request to a POST request if it isn't one, 
 			// but Extendables doesn't try to guess too much for the end developer.
 			if (m =! "POST" && m != "PUT") {
-				throw new HTTPError("Only PUT and POST requests can carry content. This is a {} request".format(m));
+				throw new HTTPError("Only PUT and POST requests can carry content. This is a " + m + " request");
 			}
 			this.header("Content-Type", "application/x-www-form-urlencoded");
 			this.header("Content-Length", data.length);
@@ -316,7 +347,12 @@ function HTTPRequest (method, url, timeout) {
 	this.auth = {
 		basic: function (user) {
 			if (user) {
-				var credentials  = "{}:{}".format(user.username, user.password).serialize('base64');
+				var credentials  = user.username + ":" + user.password;
+				if(typeof base64 != undefined){
+					base64.encode64(credentials);
+				}else{
+					encode64(credentials);
+				}				
 				self.header("Authorization", "Basic " + credentials);
 			} else {
 				return new Boolean(self.header("Authorization"));
@@ -330,11 +366,10 @@ function HTTPRequest (method, url, timeout) {
 		var encodings = ['ASCII', 'BINARY', 'UTF-8'];
 		if (encoding) {
 			// normalize encoding name
-			encoding = encoding.to('upper');
+			encoding = encoding.toUpperCase();
 			// todo: test if encoding is one of ASCII, BINARY or UTF-8, throw an error otherwise
-			if (!encodings.contains(encoding)) {
-				throw new HTTPError("Encoding should be one of {}. \
-					Received {} instead.".format(encodings.join(", "), encoding));
+			if (encodings.indexOf(encoding) == -1) {
+				throw new HTTPError("Encoding should be one of " + encodings.join(", ") + ". Received " + encoding + " instead.");
 			} else {
 				this._encoding = encoding;
 			}
@@ -348,10 +383,10 @@ function HTTPRequest (method, url, timeout) {
 		var head = [];
 		var url = this.url();
 		var path = url.pathname + url.search;
-		var request_line = "{} {} HTTP/1.1".format(this.method(), path || "/");
+		var request_line = this.method() + " " + path || "/" + " HTTP/1.1";
 		head.push(request_line);
 		// headers to string (kv) form
-		var headers = this.headers().serialize('key-value', {'separator': ': ', 'eol': '\n'});
+		var headers = this.headers().serialize('key-value', {'separator': ': ', 'eol': '\n'}); //to unextend obj method for use standalone w/ minimal imports/includes
 		head.push(headers);
 		var end_of_head = "\r\n";
 		return head.join("\r\n") + end_of_head;
@@ -382,7 +417,7 @@ function HTTPRequest (method, url, timeout) {
 			response = response.follow();
 		}
 		if (response.is_redirect) {
-			throw new HTTPError("Gave up after {} redirects.".format(max));
+			throw new HTTPError("Gave up after " + max + " redirects.");
 		}
 		return response;
 	}
@@ -395,11 +430,11 @@ function HTTPRequest (method, url, timeout) {
 		var start = new Date();
 		var socket = new Socket();
 		socket.timeout = this.timeout();
-		var host = "{}:{}".format(this.url().hostname, this.port());
+		var host = this.url().hostname + ":" + this.port();
 		if (socket.open(host, this.encoding())) {
 			var response = this._execute(socket);
 		} else {
-			throw new HTTPError("Could not connect to {}".format(host));
+			throw new HTTPError("Could not connect to "+ host);
 		}
 		// handle redirects, if any
 		if (this.follow_redirects()) {
@@ -457,13 +492,14 @@ function HTTPResponse (method, encoding, request) {
 		// TODO: this isn't right, we can only know the encoding by checking the
 		// response headers, as we can't be absolutely sure that we've received
 		// a response in the requested encoding. (Unless socket takes care of that?)
-		if (chunked_string.is(String) && this.encoding == "UTF-8") {
+		if (chunked_string instanceof String && this.encoding == "UTF-8") {
 			chunked_string = new ByteString(chunked_string);
 		}
 	
 		var terminator = 1;
 		var chunk_length = parseInt(chunked_string.toString(), 16);
-		var start_of_data = chunked_string.indexAfter('\n');
+		var index =	chunked_string.indexOf('\n');
+		var start_of_data = index == -1 ? index : index + '\n'.length;		 
 		var remainder = chunked_string.substr(start_of_data);
 		var chunk = remainder.substr(0, chunk_length);
 		if (chunk_length) {
@@ -477,8 +513,8 @@ function HTTPResponse (method, encoding, request) {
 	this.process_headers = function () {
 		var raw_head = this._parts.join('').split('\n\n', 1)[0].split('\n');
 		var raw_headers = raw_head.slice(1).join('\n');
-		this.status = raw_head[0].split(' ')[1].to('int');
-		this.headers = raw_headers.deserialize('key-value', {'separator': ': ', 'eol': '\n'});
+		this.status = parseInt(raw_head[0].split(' ')[1]);
+		this.headers = raw_headers.deserialize('key-value', {'separator': ': ', 'eol': '\n'}); //to unextend obj method for use standalone w/ minimal imports/includes
 		// flagging chunked responses
 		if (this.headers["Transfer-Encoding"] && this.headers["Transfer-Encoding"] == "chunked") {
 			this._chunked = true;
@@ -490,7 +526,7 @@ function HTTPResponse (method, encoding, request) {
 		if (this.status == 303) {
 			this.is_redirect = true;
 			this.redirection_type = 'get';
-		} else if ([301, 302, 307].contains(this.status)) {
+		} else if ([301, 302, 307].contains(this.status)) { //to unextend obj method for use standalone w/ minimal imports/includes
 			this.is_redirect = true;
 			this.redirection_type = 'repeat';
 		}
@@ -498,7 +534,7 @@ function HTTPResponse (method, encoding, request) {
 
 	this.process = function () {
 		this.raw = this._parts.join('');
-		var start_of_body = this.raw.indexAfter('\n\n');
+		var start_of_body = this.raw.indexAfter('\n\n'); //to unextend obj method for use standalone w/ minimal imports/includes
 		this.body = this.raw.substring(start_of_body);
 		// additional processing for chunked encoding
 		if (this._chunked) this.body = this.process_chunks(this.body);
@@ -511,7 +547,7 @@ function HTTPResponse (method, encoding, request) {
 		if (!this.is_redirect) {
 			throw new HTTPError("No redirect to follow.");
 		} else {
-			var request = {}.merge(this.for_request);
+			var request = {}.merge(this.for_request); //to unextend obj method for use standalone w/ minimal imports/includes
 			var from = this.for_request.url().href;
 			var to = this.headers["Location"];
 			request.url(to);

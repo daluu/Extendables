@@ -17,13 +17,16 @@ var url = "";
 if(typeof exports != 'undefined' && typeof require != 'undefined')
 	url = exports.url = require("http/url");
 
-var ByteString = null;
 if(typeof require != 'undefined')
-	ByteString = require("io/octals").ByteString;
+	var ByteString = require("io/octals").ByteString;
+else{
+	#include "../../io/lib/octals.jsx";
+	var ByteString = ByteString;
+}
 
 // definitions
 var HTTPError;
-if(typeof Error != 'undefined')
+if(typeof Error.factory != 'undefined')
 	HTTPError = Error.factory("HTTPError");
 else
 	HTTPError = Error;
@@ -276,7 +279,12 @@ function HTTPRequest (method, url, timeout) {
 	/** @desc How long before the http client should give up the request. 5 seconds by default. */
 	this.timeout = function (duration) {
 		if (duration) {
-			if (!duration.is(Number)) throw new Error("Timeout should be a number of seconds."); //originally TypeError
+			if (!duration.is(Number)){
+				if(typeof TypeError != undefined)
+					throw new TypeError("Timeout should be a number of seconds.");
+				else
+					throw new Error("Timeout should be a number of seconds.");
+			}
 			this._timeout = duration;
 		} else {
 			return this._timeout;
@@ -367,7 +375,7 @@ function HTTPRequest (method, url, timeout) {
 			// normalize encoding name
 			encoding = encoding.toUpperCase();
 			// todo: test if encoding is one of ASCII, BINARY or UTF-8, throw an error otherwise
-			if (!encodings.contains(encoding)) {
+			if (encodings.indexOf(encoding) == -1) {
 				throw new HTTPError("Encoding should be one of " + encodings.join(", ") + ". Received " + encoding + " instead.");
 			} else {
 				this._encoding = encoding;
@@ -479,7 +487,7 @@ function HTTPResponse (method, encoding, httpConnection) {
 		if (this.status == 303) {
 			this.is_redirect = true;
 			this.redirection_type = 'get';
-		} else if ([301, 302, 307].contains(this.status)) {
+		} else if ([301, 302, 307].contains(this.status)) { //to unextend obj method for use standalone w/ minimal imports/includes
 			this.is_redirect = true;
 			this.redirection_type = 'repeat';
 		}
@@ -508,7 +516,7 @@ function HTTPResponse (method, encoding, httpConnection) {
 			throw new HTTPError("No redirect to follow.");
 		} else {
 			/* Adobe's HttpConnection should auto-handle redirects?
-			var request = {}.merge(this.for_request);
+			var request = {}.merge(this.for_request); //to unextend obj method for use standalone w/ minimal imports/includes
 			var from = this.for_request.url().href;
 			var to = this.headers["Location"];
 			request.url(to);
